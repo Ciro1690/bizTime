@@ -38,12 +38,30 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { comp_code, amt } = req.body;
-        const results = await db.query(`UPDATE invoices SET comp_code=$1, amt=$2 WHERE id=$3 RETURNING id, comp_code, amt`, [comp_code, amt, id]);
+        const { amt, paid } = req.body;
+        let paid_date;
+        if (paid === true) {
+            // https://stackoverflow.com/questions/1531093/how-do-i-get-the-current-date-in-javascript
+            var today = new Date();
+            var dd = String(today.getDate()).padStart(2, '0');
+            var mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
+            var yyyy = today.getFullYear();
+
+            today = yyyy + '-' + mm + '-' + dd;
+            paid_date = today
+        } else if (paid === false) {
+            paid_date = null
+        }
+        const results = await db.query(`UPDATE invoices SET amt=$1, paid_date=$2, paid=$3 WHERE id=$4 RETURNING id, amt, paid_date, paid`, [ amt, paid_date, paid, id]);
+        const returnValues = await db.query(`
+            SELECT id, comp_code, amt, paid, add_date, paid_date
+            FROM invoices
+            WHERE id = ${id}
+        `)
         if (results.rows.length === 0) {
             throw new ExpressError(`Can't update invoice with id of ${id}`, 404)
         }
-        return res.send({ invoice: results.rows[0] })
+        return res.send({ invoice: returnValues.rows[0] })
     } catch (e) {
         return next(e)
     }
